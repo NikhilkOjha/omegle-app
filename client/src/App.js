@@ -1,3 +1,8 @@
 import React from 'react';
-function App() { return <div>Welcome to Omegle App</div>; }
+import Home from './pages/Home';
+
+function App() {
+  return <Home />;
+}
+
 export default App;

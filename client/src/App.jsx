@@ -1,8 +1,9 @@
-import React from 'react';
+// client/src/App.jsx
+import React, { useEffect } from 'react';
 import { socket } from './socket';
 import ChatRoom from './components/ChatRoom';
 import VideoChat from './components/VideoChat';
-import ChatBox from './components/ChatBox'
+import ChatBox from './components/ChatBox';
 
 function App() {
   useEffect(() => {
@@ -24,8 +25,10 @@ function App() {
     <div className="App">
       <h1>🎥 Welcome to Omegle Clone</h1>
       <p>The frontend is working!</p>
-      <VideoChat />
 
+      <VideoChat />
+      <ChatRoom />
+      <ChatBox />
     </div>
   );
 }

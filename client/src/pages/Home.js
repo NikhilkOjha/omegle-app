@@ -1,5 +1,5 @@
 import React from 'react';
-import VideoBox from '../components/VideoBox';
+import VideoBox from '../components/VideoChat';
 import ChatBox from '../components/ChatBox';
 import SidebarAds from '../components/SidebarAds';
 

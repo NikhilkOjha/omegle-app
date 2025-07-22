@@ -1,10 +1,6 @@
 // client/src/socket.js
-import { io } from "socket.io-client";
+import { io } from 'socket.io-client';
 
-// Connect to your backend
-const socket = io("https://omegle-app-0887.onrender.com", {
-  transports: ["websocket"],
-  autoConnect: true,
-});
+const socket = io(import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000');
 
 export default socket;

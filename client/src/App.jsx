@@ -1,6 +1,6 @@
 // client/src/App.jsx
 import React, { useEffect } from 'react';
-import { socket } from './socket';
+import  socket  from './socket';
 import ChatRoom from './components/ChatRoom';
 import VideoChat from './components/VideoChat';
 import ChatBox from './components/ChatBox';

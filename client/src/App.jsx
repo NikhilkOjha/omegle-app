@@ -1,11 +1,13 @@
-// client/src/App.jsx
 import React from 'react';
+import ChatRoom from '.components/ChatRoom';
+import VideoChat from './components/VideoChat';
 
 function App() {
   return (
-    <div style={{ padding: 40, fontFamily: 'sans-serif' }}>
+    <div>
       <h1>🎥 Welcome to Omegle Clone</h1>
-      <p>The frontend is working!</p>
+      <VideoChat />
+      <ChatRoom />
     </div>
   );
 }

@@ -3,7 +3,7 @@ import http from 'http';
 import cors from 'cors';
 import { Server } from 'socket.io';
 import dotenv from 'dotenv';
-import { addToQueue, getMatch } from './utils/matchManager.js';
+import { addToQueue, removeFromQueue, getMatch, isInQueue } from './utils/matchManager.js';
 
 dotenv.config();
 
@@ -19,44 +19,85 @@ const io = new Server(server, {
   }
 });
 
-// Handle socket connections
 io.on('connection', (socket) => {
-  console.log('New user connected:', socket.id);
+  console.log('🟢 New user connected:', socket.id);
 
-  socket.on('disconnect', () => {
-    console.log('User disconnected:', socket.id);
+  // Match on connect
+  tryToMatch(socket);
+
+  // Signaling events
+  socket.on('offer', (data) => {
+    if (socket.partner) {
+      socket.partner.emit('offer', data);
+    }
   });
 
-  const partner = getMatch(socket);
+  socket.on('answer', (data) => {
+    if (socket.partner) {
+      socket.partner.emit('answer', data);
+    }
+  });
 
-  if (partner) {
-    socket.partner = partner;
-    partner.partner = socket;
+  socket.on('ice-candidate', (candidate) => {
+    if (socket.partner) {
+      socket.partner.emit('ice-candidate', candidate);
+    }
+  });
 
-    socket.emit('match', { partnerId: partner.id });
-    partner.emit('match', { partnerId: socket.id });
-  } else {
-    addToQueue(socket);
+  // Chat message forwarding
+  socket.on('sendMessage', (msg) => {
+    if (socket.partner) {
+      socket.partner.emit('receiveMessage', msg);
+    }
+  });
+
+  // Handle skip
+  socket.on('skipPartner', () => {
+    console.log(`🔁 ${socket.id} skipped their partner`);
+    disconnectPartner(socket, true);
+    tryToMatch(socket); // Try to find a new one
+  });
+
+  // Handle disconnect
+  socket.on('disconnect', () => {
+    console.log('🔴 User disconnected:', socket.id);
+    disconnectPartner(socket, false);
+    removeFromQueue(socket);
+  });
+
+  // Utility functions
+  function tryToMatch(socket) {
+    if (isInQueue(socket)) return;
+
+    const partner = getMatch(socket);
+
+    if (partner) {
+      socket.partner = partner;
+      partner.partner = socket;
+
+      socket.emit('partnerFound');
+      partner.emit('partnerFound');
+
+      socket.emit('ready');
+      partner.emit('ready');
+    } else {
+      addToQueue(socket);
+    }
   }
 
-  socket.on('signal', data => {
-    if (socket.partner) {
-      socket.partner.emit('signal', data);
-    }
-  });
+  function disconnectPartner(socket, notify = true) {
+    const partner = socket.partner;
+    if (partner) {
+      partner.partner = null;
+      socket.partner = null;
 
-  socket.on('message', msg => {
-    if (socket.partner) {
-      socket.partner.emit('message', msg);
-    }
-  });
+      if (notify) {
+        partner.emit('partnerDisconnected');
+      }
 
-  socket.on('disconnect', () => {
-    if (socket.partner) {
-      socket.partner.emit('partner-disconnected');
-      socket.partner.partner = null;
+      addToQueue(partner); // Requeue the partner if they didn't skip
     }
-  });
+  }
 });
 
 const PORT = process.env.PORT || 5000;

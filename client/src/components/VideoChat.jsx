@@ -46,7 +46,14 @@ const VideoChat = () => {
         }
       });
 
-      socket.emit('join-video');
+      socket.on('partnerFound', () => {
+        console.log('Partner found, starting video chat');
+        // Notify the peer to start signaling
+        peerConnection.current.createOffer().then((offer) => {
+          peerConnection.current.setLocalDescription(offer);
+          socket.emit('offer', offer);
+        });
+      }); s
 
       socket.on('ready', async () => {
         const offer = await peerConnection.current.createOffer();
@@ -68,5 +75,10 @@ const VideoChat = () => {
     </div>
   );
 };
+<div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '1rem' }}>
+  <video ref={localVideoRef} autoPlay muted style={{ width: '100%', maxWidth: '400px' }} />
+  <video ref={remoteVideoRef} autoPlay style={{ width: '100%', maxWidth: '400px' }} />
+</div>
+
 
 export default VideoChat;

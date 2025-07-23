@@ -3,64 +3,68 @@ import React, { useEffect, useRef } from 'react';
 import socket from '../socket';
 
 const VideoChat = () => {
-  const localVideoRef = useRef();
-  const remoteVideoRef = useRef();
+  const localVideoRef = useRef(null);
+  const remoteVideoRef = useRef(null);
   const peerConnection = useRef(null);
 
   useEffect(() => {
-    navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then((stream) => {
-      localVideoRef.current.srcObject = stream;
+    const init = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: true,
+        });
 
-      peerConnection.current = new RTCPeerConnection();
+        localVideoRef.current.srcObject = stream;
 
-      stream.getTracks().forEach((track) => {
-        peerConnection.current.addTrack(track, stream);
-      });
+        peerConnection.current = new RTCPeerConnection();
 
-      peerConnection.current.ontrack = (event) => {
-        remoteVideoRef.current.srcObject = event.streams[0];
-      };
+        stream.getTracks().forEach((track) => {
+          peerConnection.current.addTrack(track, stream);
+        });
 
-      peerConnection.current.onicecandidate = (event) => {
-        if (event.candidate) {
-          socket.emit('ice-candidate', event.candidate);
-        }
-      };
+        peerConnection.current.ontrack = (event) => {
+          remoteVideoRef.current.srcObject = event.streams[0];
+        };
 
-      socket.on('offer', async (offer) => {
-        await peerConnection.current.setRemoteDescription(new RTCSessionDescription(offer));
-        const answer = await peerConnection.current.createAnswer();
-        await peerConnection.current.setLocalDescription(answer);
-        socket.emit('answer', answer);
-      });
+        peerConnection.current.onicecandidate = (event) => {
+          if (event.candidate) {
+            socket.emit('ice-candidate', event.candidate);
+          }
+        };
 
-      socket.on('answer', async (answer) => {
-        await peerConnection.current.setRemoteDescription(new RTCSessionDescription(answer));
-      });
+        socket.on('offer', async (offer) => {
+          await peerConnection.current.setRemoteDescription(new RTCSessionDescription(offer));
+          const answer = await peerConnection.current.createAnswer();
+          await peerConnection.current.setLocalDescription(answer);
+          socket.emit('answer', answer);
+        });
 
-      socket.on('ice-candidate', async (candidate) => {
-        try {
-          await peerConnection.current.addIceCandidate(new RTCIceCandidate(candidate));
-        } catch (error) {
-          console.error('Error adding ICE candidate', error);
-        }
-      });
+        socket.on('answer', async (answer) => {
+          await peerConnection.current.setRemoteDescription(new RTCSessionDescription(answer));
+        });
 
-      socket.on('partnerFound', () => {
-        console.log('Partner found, starting video chat');
-        // Notify the peer to start signaling
-        peerConnection.current.createOffer().then((offer) => {
-          peerConnection.current.setLocalDescription(offer);
+        socket.on('ice-candidate', async (candidate) => {
+          try {
+            await peerConnection.current.addIceCandidate(new RTCIceCandidate(candidate));
+          } catch (err) {
+            console.error('Error adding ICE candidate:', err);
+          }
+        });
+
+        socket.emit('join-video');
+
+        socket.on('ready', async () => {
+          const offer = await peerConnection.current.createOffer();
+          await peerConnection.current.setLocalDescription(offer);
           socket.emit('offer', offer);
         });
-      }); s
+      } catch (err) {
+        console.error('Error accessing media devices.', err);
+      }
+    };
 
-      socket.on('ready', async () => {
-        const offer = await peerConnection.current.createOffer();
-        await peerConnection.current.setLocalDescription(offer);
-        socket.emit('offer', offer);
-      });
-    });
+    init();
 
     return () => {
       socket.disconnect();
@@ -75,10 +79,5 @@ const VideoChat = () => {
     </div>
   );
 };
-<div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '1rem' }}>
-  <video ref={localVideoRef} autoPlay muted style={{ width: '100%', maxWidth: '400px' }} />
-  <video ref={remoteVideoRef} autoPlay style={{ width: '100%', maxWidth: '400px' }} />
-</div>
-
 
 export default VideoChat;

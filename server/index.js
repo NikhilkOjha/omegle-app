@@ -3,7 +3,13 @@ import http from 'http';
 import cors from 'cors';
 import { Server } from 'socket.io';
 import dotenv from 'dotenv';
-import { addToQueue, removeFromQueue, getMatch, isInQueue } from './utils/matchManager.js';
+import {
+  addToQueue,
+  removeFromQueue,
+  getMatch,
+  isInQueue,
+  queue
+} from './utils/matchManager.js';
 
 dotenv.config();
 
@@ -15,57 +21,49 @@ const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
     origin: ['https://omegle-app.vercel.app'],
-    methods: ['GET', 'POST']
-  }
+    methods: ['GET', 'POST'],
+    credentials: true,
+  },
 });
 
 io.on('connection', (socket) => {
   console.log('🟢 New user connected:', socket.id);
 
-  // Match on connect
   tryToMatch(socket);
 
-  // Signaling events
+  // WebRTC signaling
   socket.on('offer', (data) => {
-    if (socket.partner) {
-      socket.partner.emit('offer', data);
-    }
+    socket.partner?.emit('offer', data);
   });
 
   socket.on('answer', (data) => {
-    if (socket.partner) {
-      socket.partner.emit('answer', data);
-    }
+    socket.partner?.emit('answer', data);
   });
 
   socket.on('ice-candidate', (candidate) => {
-    if (socket.partner) {
-      socket.partner.emit('ice-candidate', candidate);
-    }
+    socket.partner?.emit('ice-candidate', candidate);
   });
 
-  // Chat message forwarding
+  // Chat message relay
   socket.on('sendMessage', (msg) => {
-    if (socket.partner) {
-      socket.partner.emit('receiveMessage', msg);
-    }
+    socket.partner?.emit('receiveMessage', msg);
   });
 
-  // Handle skip
+  // Skip current partner and find a new one
   socket.on('skipPartner', () => {
     console.log(`🔁 ${socket.id} skipped their partner`);
     disconnectPartner(socket, true);
-    tryToMatch(socket); // Try to find a new one
+    tryToMatch(socket);
   });
 
-  // Handle disconnect
+  // Disconnect cleanup
   socket.on('disconnect', () => {
     console.log('🔴 User disconnected:', socket.id);
     disconnectPartner(socket, false);
     removeFromQueue(socket);
   });
 
-  // Utility functions
+  // Matching logic
   function tryToMatch(socket) {
     if (isInQueue(socket)) return;
 
@@ -75,6 +73,8 @@ io.on('connection', (socket) => {
       socket.partner = partner;
       partner.partner = socket;
 
+      console.log(`🔗 Matched: ${socket.id} <--> ${partner.id}`);
+
       socket.emit('partnerFound');
       partner.emit('partnerFound');
 
@@ -82,11 +82,14 @@ io.on('connection', (socket) => {
       partner.emit('ready');
     } else {
       addToQueue(socket);
+      console.log(`⏳ Added to queue: ${socket.id}`);
     }
   }
 
+  // Disconnect and optionally requeue
   function disconnectPartner(socket, notify = true) {
     const partner = socket.partner;
+
     if (partner) {
       partner.partner = null;
       socket.partner = null;
@@ -95,7 +98,10 @@ io.on('connection', (socket) => {
         partner.emit('partnerDisconnected');
       }
 
-      addToQueue(partner); // Requeue the partner if they didn't skip
+      if (partner.connected) {
+        addToQueue(partner);
+        console.log(`♻️ Requeued partner: ${partner.id}`);
+      }
     }
   }
 });

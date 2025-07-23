@@ -1,35 +1,41 @@
-// utils/matchManager.js
+// server/utils/matchManager.js
 
-let waitingUsers = [];
+// Store unmatched sockets in a queue
+const queue = new Set();
 
-// Add user to waiting queue
+/**
+ * Add a user to the matchmaking queue
+ */
 export function addToQueue(socket) {
-  console.log(`🕒 Added to queue: ${socket.id}`);
-  waitingUsers.push(socket);
+  queue.add(socket);
 }
 
-// Match the socket with another available user
-export function getMatch(socket) {
-  if (waitingUsers.length === 0) {
-    return null;
-  }
-
-  // Exclude the current socket from matching with itself
-  const partner = waitingUsers.find(s => s.id !== socket.id);
-
-  if (!partner) {
-    return null;
-  }
-
-  // Remove matched partner from queue
-  waitingUsers = waitingUsers.filter(s => s.id !== partner.id);
-
-  console.log(`🔗 Matched: ${socket.id} <--> ${partner.id}`);
-  return partner;
-}
-
-// Remove user from queue on disconnect
+/**
+ * Remove a user from the matchmaking queue
+ */
 export function removeFromQueue(socket) {
-  waitingUsers = waitingUsers.filter(s => s.id !== socket.id);
-  console.log(`❌ Removed from queue: ${socket.id}`);
+  queue.delete(socket);
 }
+
+/**
+ * Check if the socket is already in the queue
+ */
+export function isInQueue(socket) {
+  return queue.has(socket);
+}
+
+/**
+ * Find a match for a socket
+ */
+export function getMatch(socket) {
+  for (let partner of queue) {
+    if (partner !== socket) {
+      queue.delete(partner);
+      return partner;
+    }
+  }
+
+  return null;
+}
+
+export { queue };
